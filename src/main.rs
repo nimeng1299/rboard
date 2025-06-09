@@ -1,3 +1,5 @@
-fn main() {
-    println!("Hello, world!");
+use rboard::start;
+
+fn main() -> iced::Result {
+    start()
 }
