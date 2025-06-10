@@ -1,14 +1,17 @@
 use iced::{
-    Renderer, Theme,
+    Color, Renderer, Theme,
     mouse::Cursor,
     widget::canvas::{self, Geometry},
 };
 
-use crate::message::Message;
+use crate::{
+    chessboard::{chessboardTrait::ChessboardTrait, gomoku::Gomoku},
+    message::Message,
+};
 
 pub struct Board {}
 
-impl canvas::Program<Message> for Board {
+impl<Message> canvas::Program<Message> for Board {
     type State = BoardState;
 
     fn draw(
@@ -19,11 +22,24 @@ impl canvas::Program<Message> for Board {
         bounds: iced::Rectangle,
         cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
-        vec![]
+        // let p = cursor.position_in(bounds);
+        // println!("{:#?}", p);
+
+        let mut frame = canvas::Frame::new(renderer, bounds.size());
+        let circle = canvas::Path::circle(frame.center(), 10.0);
+        frame.fill(&circle, Color::BLACK);
+        vec![frame.into_geometry()]
     }
 }
 
-#[derive(Default)]
 pub struct BoardState {
-    // Define the state of the chessboard, pieces, etc.
+    chessboard: Box<dyn ChessboardTrait>,
+}
+
+impl Default for BoardState {
+    fn default() -> Self {
+        BoardState {
+            chessboard: Box::new(Gomoku::new()),
+        }
+    }
 }

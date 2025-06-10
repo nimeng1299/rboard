@@ -1,8 +1,10 @@
 pub mod board;
+pub mod chessboard;
 pub mod message;
 
-use iced::widget::text;
+use iced::widget::{canvas, column, text};
 
+use crate::board::Board;
 use crate::message::Message;
 
 pub fn start() -> iced::Result {
@@ -21,6 +23,6 @@ impl RBoard {
 
     fn view(&self) -> iced::Element<Message> {
         // Render the chessboard and pieces
-        text("rboard").into()
+        column![text("board"), canvas(Board {})].into()
     }
 }
