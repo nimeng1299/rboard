@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use iced::{
     Color, Point, Renderer, Theme,
-    mouse::Cursor,
+    mouse::{self, Cursor},
     widget::canvas::{self, Geometry, Stroke, Text},
 };
 
@@ -126,6 +126,16 @@ impl<Message> canvas::Program<Message> for Board {
             }
         }
         vec![frame.into_geometry()]
+    }
+
+    fn update(
+        &self,
+        _state: &mut Self::State,
+        _event: canvas::Event,
+        _bounds: iced::Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> (canvas::event::Status, Option<Message>) {
+        (canvas::event::Status::Ignored, None)
     }
 }
 
