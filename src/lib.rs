@@ -2,6 +2,7 @@ pub mod board;
 pub mod chessboard;
 pub mod message;
 
+use iced::Length;
 use iced::widget::{canvas, column, text};
 
 use crate::board::Board;
@@ -22,7 +23,8 @@ impl RBoard {
     }
 
     fn view(&self) -> iced::Element<Message> {
+        let board = canvas(Board {}).width(Length::Fill).height(Length::Fill);
         // Render the chessboard and pieces
-        column![text("board"), canvas(Board {})].into()
+        column![text("board"), board].padding(10).spacing(5).into()
     }
 }

@@ -1,4 +1,4 @@
-use crate::chessboard::chessboardTrait::ChessboardTrait;
+use crate::chessboard::chessboard_trait::ChessboardTrait;
 
 pub struct Gomoku {}
 
