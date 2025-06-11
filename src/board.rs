@@ -13,7 +13,7 @@ use crate::{
 
 pub struct Board {}
 
-impl<Message> canvas::Program<Message> for Board {
+impl canvas::Program<Message> for Board {
     type State = BoardState;
 
     fn draw(
@@ -107,8 +107,8 @@ impl<Message> canvas::Program<Message> for Board {
         //鼠标位置
         let p = cursor.position_in(bounds);
         if let Some(p_cursor) = p {
-            let x_count = ((p_cursor.x - x_padding) / size) as i32;
-            let y_count = ((p_cursor.y - y_padding) / size) as i32;
+            let x_count = ((p_cursor.x - x_padding) / size).floor() as i32;
+            let y_count = ((p_cursor.y - y_padding) / size).floor() as i32;
             if x_count >= 0 && x_count < x as i32 && y_count >= 0 && y_count < y as i32 {
                 // 定义颜色
                 let light_gray = Color::from_rgb(0.9, 0.9, 0.9); // 淡灰色背景
@@ -135,15 +135,16 @@ impl<Message> canvas::Program<Message> for Board {
         let pieces = state.chessboard.get_pieces();
         for i in 0..pieces.len() {
             for j in 0..pieces[i].len() {
-                let (c1, c2) = pieces[i][j];
-                let x = x_padding + i as f32 * size + size / 2.0;
-                let y = y_padding + j as f32 * size + size / 2.0;
-                let center = iced::Point::new(x, y);
-                let circle = canvas::Path::circle(center, size / 2.0);
+                if let Some((c1, c2)) = pieces[i][j] {
+                    let x = x_padding + i as f32 * size + size / 2.0;
+                    let y = y_padding + j as f32 * size + size / 2.0;
+                    let center = iced::Point::new(x, y);
+                    let circle = canvas::Path::circle(center, size / 2.0 * 0.9);
 
-                frame.fill(&circle, c1);
+                    frame.fill(&circle, c1);
 
-                frame.stroke(&circle, Stroke::default().with_color(c2).with_width(2.0));
+                    frame.stroke(&circle, Stroke::default().with_color(c2).with_width(2.0));
+                }
             }
         }
         vec![frame.into_geometry()]
@@ -167,10 +168,13 @@ impl<Message> canvas::Program<Message> for Board {
                 let y_padding = (_bounds.height - size * y as f32) / 2f32 + size / 2f32;
                 let p = _cursor.position_in(_bounds);
                 if let Some(p_cursor) = p {
-                    let x_count = ((p_cursor.x - x_padding) / size) as i32;
-                    let y_count = ((p_cursor.y - y_padding) / size) as i32;
+                    let x_count = ((p_cursor.x - x_padding) / size).floor() as i32;
+                    let y_count = ((p_cursor.y - y_padding) / size).floor() as i32;
                     if x_count >= 0 && x_count < x as i32 && y_count >= 0 && y_count < y as i32 {
-                        println!("{}, {}", x_count, y_count);
+                        let r = _state.chessboard.go(x_count, y_count);
+                        if let Some(msg) = r {
+                            return (canvas::event::Status::Ignored, Some(Message::Engine(msg)));
+                        }
                     }
                 }
             }
