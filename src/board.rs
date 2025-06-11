@@ -25,6 +25,11 @@ impl<Message> canvas::Program<Message> for Board {
         cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
+        frame.fill_rectangle(
+            Point::ORIGIN,
+            bounds.size(),
+            Color::from_rgb8(247, 238, 214),
+        );
 
         let (x, y) = state.chessboard.get_length();
         let x_size = (bounds.width - 5f32) / (x + 1) as f32;
@@ -104,7 +109,7 @@ impl<Message> canvas::Program<Message> for Board {
         if let Some(p_cursor) = p {
             let x_count = ((p_cursor.x - x_padding) / size) as i32;
             let y_count = ((p_cursor.y - y_padding) / size) as i32;
-            if x_count > 0 && x_count < x as i32 && y_count > 0 && y_count < y as i32 {
+            if x_count >= 0 && x_count < x as i32 && y_count >= 0 && y_count < y as i32 {
                 // 定义颜色
                 let light_gray = Color::from_rgb(0.9, 0.9, 0.9); // 淡灰色背景
                 let purple = Color::from_rgb(0.5, 0.0, 0.5); // 紫色边框
@@ -121,8 +126,24 @@ impl<Message> canvas::Program<Message> for Board {
 
                 frame.stroke(
                     &circle,
-                    Stroke::default().with_color(purple).with_width(2.0), // 边框宽度3像素
+                    Stroke::default().with_color(purple).with_width(2.0),
                 );
+            }
+        }
+
+        //画棋子
+        let pieces = state.chessboard.get_pieces();
+        for i in 0..pieces.len() {
+            for j in 0..pieces[i].len() {
+                let (c1, c2) = pieces[i][j];
+                let x = x_padding + i as f32 * size + size / 2.0;
+                let y = y_padding + j as f32 * size + size / 2.0;
+                let center = iced::Point::new(x, y);
+                let circle = canvas::Path::circle(center, size / 2.0);
+
+                frame.fill(&circle, c1);
+
+                frame.stroke(&circle, Stroke::default().with_color(c2).with_width(2.0));
             }
         }
         vec![frame.into_geometry()]
@@ -135,6 +156,26 @@ impl<Message> canvas::Program<Message> for Board {
         _bounds: iced::Rectangle,
         _cursor: mouse::Cursor,
     ) -> (canvas::event::Status, Option<Message>) {
+        match _event {
+            canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                let (x, y) = _state.chessboard.get_length();
+                let x_size = (_bounds.width - 5f32) / (x + 1) as f32;
+                let y_size = (_bounds.height - 5f32) / (y + 1) as f32;
+                let size = x_size.min(y_size);
+
+                let x_padding = (_bounds.width - size * x as f32) / 2f32 + size / 2f32;
+                let y_padding = (_bounds.height - size * y as f32) / 2f32 + size / 2f32;
+                let p = _cursor.position_in(_bounds);
+                if let Some(p_cursor) = p {
+                    let x_count = ((p_cursor.x - x_padding) / size) as i32;
+                    let y_count = ((p_cursor.y - y_padding) / size) as i32;
+                    if x_count >= 0 && x_count < x as i32 && y_count >= 0 && y_count < y as i32 {
+                        println!("{}, {}", x_count, y_count);
+                    }
+                }
+            }
+            _ => {}
+        }
         (canvas::event::Status::Ignored, None)
     }
 }
