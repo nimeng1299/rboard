@@ -34,7 +34,7 @@ impl canvas::Program<Message> for Board {
             Color::from_rgb8(247, 238, 214),
         );
 
-        let (x, y) = (self.count);
+        let (x, y) = self.count;
         let x_size = (bounds.width - 5f32) / (x + 1) as f32;
         let y_size = (bounds.height - 5f32) / (y + 1) as f32;
         let size = x_size.min(y_size);

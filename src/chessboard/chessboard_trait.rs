@@ -8,4 +8,5 @@ pub trait ChessboardTrait {
     //Err -> None
     // Ok -> eg. "play W G3"
     fn go(&mut self, x: i32, y: i32) -> Option<String>;
+    fn new_board(&mut self);
 }

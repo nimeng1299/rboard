@@ -55,4 +55,8 @@ impl ChessboardTrait for Gomoku {
             15 - y
         ))
     }
+    fn new_board(&mut self) {
+        self.board = vec![vec![-1; 15]; 15];
+        self.current_player = 0;
+    }
 }
