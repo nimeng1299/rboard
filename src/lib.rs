@@ -9,29 +9,32 @@ use iced::{Background, Border, Color, Font, Length};
 use iced_aw::menu::{Item, Menu};
 use iced_aw::{menu_bar, menu_items};
 
-use crate::board::Board;
+use crate::board::{Board, BoardState};
 use crate::message::Message;
 
 use crate::style as styles;
 
 pub fn start() -> iced::Result {
-    // const FONT: iced::Font = ::iced::Font::
-    //     name: "HYWenHei",
-    //     bytes: include_bytes!("E:\\HYWenHei85W.ttf"),
-    // };
     iced::application("rboard", RBoard::update, RBoard::view)
+        .font(include_bytes!("E:\\85W.ttf"))
         .default_font(Font::with_name("汉仪文黑"))
         .run()
 }
 
 #[derive(Default)]
 struct RBoard {
-    // Define the state of the chessboard, pieces, etc.
+    board_state: BoardState,
 }
 
 impl RBoard {
     fn update(&mut self, message: Message) {
-        // Update the state based on user input or game logic
+        match message {
+            Message::GoBoard(x, y) => {
+                self.board_state.chessboard.go(x, y);
+            }
+            Message::NewBoard => {}
+            _ => {}
+        }
     }
 
     fn view(&self) -> iced::Element<Message> {
@@ -43,7 +46,12 @@ impl RBoard {
             ))
         ));
 
-        let board = canvas(Board {}).width(Length::Fill).height(Length::Fill);
+        let board = canvas(Board {
+            count: self.board_state.chessboard.get_length(),
+            pieces: self.board_state.chessboard.get_pieces(),
+        })
+        .width(Length::Fill)
+        .height(Length::Fill);
         let rate = progress_bar(0.0..=100.0, 35.0).style(|_| progress_bar::Style {
             background: Background::Color(Color::WHITE),
             bar: Background::Color(Color::BLACK),

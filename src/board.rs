@@ -11,10 +11,13 @@ use crate::{
     message::Message,
 };
 
-pub struct Board {}
+pub struct Board {
+    pub count: (u32, u32),
+    pub pieces: Vec<Vec<Option<(Color, Color)>>>,
+}
 
 impl canvas::Program<Message> for Board {
-    type State = BoardState;
+    type State = ();
 
     fn draw(
         &self,
@@ -31,7 +34,7 @@ impl canvas::Program<Message> for Board {
             Color::from_rgb8(247, 238, 214),
         );
 
-        let (x, y) = state.chessboard.get_length();
+        let (x, y) = (self.count);
         let x_size = (bounds.width - 5f32) / (x + 1) as f32;
         let y_size = (bounds.height - 5f32) / (y + 1) as f32;
         let size = x_size.min(y_size);
@@ -132,10 +135,9 @@ impl canvas::Program<Message> for Board {
         }
 
         //画棋子
-        let pieces = state.chessboard.get_pieces();
-        for i in 0..pieces.len() {
-            for j in 0..pieces[i].len() {
-                if let Some((c1, c2)) = pieces[i][j] {
+        for i in 0..self.pieces.len() {
+            for j in 0..self.pieces[i].len() {
+                if let Some((c1, c2)) = self.pieces[i][j] {
                     let x = x_padding + i as f32 * size + size / 2.0;
                     let y = y_padding + j as f32 * size + size / 2.0;
                     let center = iced::Point::new(x, y);
@@ -159,7 +161,7 @@ impl canvas::Program<Message> for Board {
     ) -> (canvas::event::Status, Option<Message>) {
         match _event {
             canvas::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let (x, y) = _state.chessboard.get_length();
+                let (x, y) = self.count;
                 let x_size = (_bounds.width - 5f32) / (x + 1) as f32;
                 let y_size = (_bounds.height - 5f32) / (y + 1) as f32;
                 let size = x_size.min(y_size);
@@ -171,10 +173,10 @@ impl canvas::Program<Message> for Board {
                     let x_count = ((p_cursor.x - x_padding) / size).floor() as i32;
                     let y_count = ((p_cursor.y - y_padding) / size).floor() as i32;
                     if x_count >= 0 && x_count < x as i32 && y_count >= 0 && y_count < y as i32 {
-                        let r = _state.chessboard.go(x_count, y_count);
-                        if let Some(msg) = r {
-                            return (canvas::event::Status::Ignored, Some(Message::Engine(msg)));
-                        }
+                        return (
+                            canvas::event::Status::Ignored,
+                            Some(Message::GoBoard(x_count, y_count)),
+                        );
                     }
                 }
             }
@@ -185,7 +187,7 @@ impl canvas::Program<Message> for Board {
 }
 
 pub struct BoardState {
-    chessboard: Box<dyn ChessboardTrait>,
+    pub chessboard: Box<dyn ChessboardTrait>,
 }
 
 impl Default for BoardState {

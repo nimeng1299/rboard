@@ -1,5 +1,5 @@
 #[derive(Debug, Clone)]
 pub enum Message {
-    Engine(String),
+    GoBoard(i32, i32),
     NewBoard,
 }
