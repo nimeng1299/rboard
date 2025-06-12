@@ -2,8 +2,10 @@ use std::{fs::File, io::Write, path::PathBuf};
 
 use json::JsonValue;
 
+use crate::engine::engine_args::EngineArgs;
+
 pub struct EnginePaths {
-    pub paths: Vec<String>,
+    pub paths: Vec<EngineArgs>,
     pub current_path: Option<i32>,
 }
 
@@ -27,10 +29,7 @@ impl EnginePaths {
         match path {
             JsonValue::Array(path) => {
                 for i in path {
-                    match i {
-                        JsonValue::String(s) => paths.push(s),
-                        _ => {}
-                    }
+                    paths.push(EngineArgs::from_json(&i));
                 }
             }
             _ => {}
@@ -43,7 +42,7 @@ impl EnginePaths {
     fn save(&self) -> Result<(), String> {
         let mut array = JsonValue::new_array();
         for p in self.paths.clone() {
-            let _ = array.push(p);
+            let _ = array.push(p.to_json());
         }
         let data = json::object! {
             paths: array
@@ -55,12 +54,13 @@ impl EnginePaths {
         Ok(())
     }
     pub fn add(&mut self, path: PathBuf) -> Result<(), String> {
-        self.paths
-            .push(path.to_str().ok_or("cannot add path")?.to_string());
+        self.paths.push(EngineArgs::new(
+            path.to_str().ok_or("cannot add path")?.to_string(),
+        ));
         self.save()
     }
-    pub fn get_all_paths(&self) -> Vec<&str> {
-        self.paths.iter().map(|s| s.as_str()).collect()
+    pub fn get_all_paths(&self) -> Vec<EngineArgs> {
+        self.paths.clone()
     }
 }
 

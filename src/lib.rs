@@ -27,6 +27,8 @@ pub fn start() -> iced::Result {
 struct RBoard {
     board_state: BoardState,
     engine_path: EnginePaths,
+
+    show_engine_manager: bool,
 }
 
 impl RBoard {
@@ -57,6 +59,9 @@ impl RBoard {
                 }
             },
             _ => {}
+            Message::OpenEngineManager => {
+                self.show_engine_manager = true;
+            }
         }
         iced::Task::none()
     }
@@ -67,16 +72,16 @@ impl RBoard {
         let e_p = self.engine_path.get_all_paths();
         let mut e_len = 15;
         for i in e_p {
-            let s = i.to_string();
+            let s = i.path.clone();
             e_len = e_len.max(s.len());
             engine_path.push(Item::new(styles::button::secondary_menu_button(
-                i,
-                Message::ChangeEngine(i.to_string()),
+                text(s.clone()),
+                Message::ChangeEngine(s.clone()),
             )));
         }
         engine_path.push(Item::new(styles::button::secondary_menu_button(
-            "添加引擎...",
-            Message::AddEngineButton,
+            "引擎管理",
+            Message::OpenEngineManager,
         )));
         #[rustfmt::skip]
         let menu_bar = menu_bar!(

@@ -1,12 +1,12 @@
 use iced::{
     Background, Border, Color, Element, Length,
     widget::{
-        self, Button,
+        self,
         button::{self, Status, Style},
     },
 };
 
-use crate::{message::Message, style};
+use crate::message::Message;
 
 pub fn secondary_menu_button<'a>(
     content: impl Into<Element<'a, Message>>,

@@ -7,4 +7,5 @@ pub enum Message {
     AddEngineButton,
     AddEngige(Option<FileHandle>),
     ChangeEngine(String),
+    OpenEngineManager,
 }
