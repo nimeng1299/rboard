@@ -6,4 +6,5 @@ pub enum Message {
     GoBoard(i32, i32),
     AddEngineButton,
     AddEngige(Option<FileHandle>),
+    ChangeEngine(String),
 }

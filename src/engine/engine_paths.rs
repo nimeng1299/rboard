@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write, path::PathBuf};
+
 use json::JsonValue;
 
 pub struct EnginePaths {
@@ -12,10 +14,12 @@ impl EnginePaths {
             current_path: None,
         }
     }
-    fn read_to_file() -> Option<Self> {
-        //获取运行文件夹
+    fn get_current_path() -> Option<PathBuf> {
         let current_path = std::env::current_dir().ok()?;
-        let path = current_path.join("engines.json");
+        Some(current_path.join("engines.json"))
+    }
+    fn read_to_file() -> Option<Self> {
+        let path = Self::get_current_path()?;
         let s = std::fs::read_to_string(path).ok()?;
         let json = json::parse(s.as_str()).ok()?;
         let path = json["paths"].clone();
@@ -31,11 +35,32 @@ impl EnginePaths {
             }
             _ => {}
         }
-        let current = json["current_path"].clone();
         Some(EnginePaths {
             paths,
-            current_path: current.as_i32(),
+            current_path: None,
         })
+    }
+    fn save(&self) -> Result<(), String> {
+        let mut array = JsonValue::new_array();
+        for p in self.paths.clone() {
+            let _ = array.push(p);
+        }
+        let data = json::object! {
+            paths: array
+        };
+        let mut file = File::create(Self::get_current_path().ok_or("can open file".to_string())?)
+            .map_err(|e| e.to_string())?;
+        file.write_all(data.to_string().as_bytes())
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    pub fn add(&mut self, path: PathBuf) -> Result<(), String> {
+        self.paths
+            .push(path.to_str().ok_or("cannot add path")?.to_string());
+        self.save()
+    }
+    pub fn get_all_paths(&self) -> Vec<&str> {
+        self.paths.iter().map(|s| s.as_str()).collect()
     }
 }
 

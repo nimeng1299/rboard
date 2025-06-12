@@ -49,26 +49,49 @@ impl RBoard {
             }
             Message::AddEngige(result) => match result {
                 Some(path) => {
-                    println!("{:?}", path);
+                    let path = path.path().to_path_buf();
+                    self.engine_path.add(path);
                 }
                 None => {
                     eprintln!("Error adding engine path");
                 }
             },
+            _ => {}
         }
         iced::Task::none()
     }
 
     fn view(&self) -> iced::Element<Message> {
-        let menu_template = |items| Menu::new(items).max_width(100.0).offset(15.0).spacing(3.0);
+        let menu_template = |items| Menu::new(items).max_width(200.0).offset(15.0).spacing(3.0);
+        let mut engine_path = vec![];
+        let e_p = self.engine_path.get_all_paths();
+        let mut e_len = 15;
+        for i in e_p {
+            let s = i.to_string();
+            e_len = e_len.max(s.len());
+            engine_path.push(Item::new(styles::button::secondary_menu_button(
+                i,
+                Message::ChangeEngine(i.to_string()),
+            )));
+        }
+        engine_path.push(Item::new(styles::button::secondary_menu_button(
+            "添加引擎...",
+            Message::AddEngineButton,
+        )));
         #[rustfmt::skip]
-        let menu_bar = menu_bar!((
+        let menu_bar = menu_bar!(
+            (
             text("菜单"),
             menu_template(menu_items!(
                 (styles::button::secondary_menu_button("新棋盘", Message::NewBoard))
                 (styles::button::secondary_menu_button("添加引擎...", Message::AddEngineButton))
             ))
-        ));
+            )
+            (
+            text("引擎"),
+            menu_template(engine_path).max_width(e_len as f32 * 10.0)
+            )
+        ).spacing(10.0);
 
         let board = canvas(Board {
             count: self.board_state.chessboard.get_length(),
