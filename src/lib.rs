@@ -4,14 +4,18 @@ pub mod engine;
 pub mod message;
 pub mod style;
 
-use iced::widget::{canvas, column, progress_bar, text};
+use std::sync::Arc;
+
+use iced::widget::{Column, Row, canvas, column, progress_bar, responsive, text};
 use iced::{Background, Border, Color, Font, Length, Task};
 use iced_aw::menu::{Item, Menu};
 use iced_aw::{menu_bar, menu_items};
+use iced_table::table;
 use rfd::AsyncFileDialog;
 
 use crate::board::{Board, BoardState};
 use crate::engine::engine_paths::EnginePaths;
+use crate::engine::engine_table::{self, EngineTable};
 use crate::message::Message;
 
 use crate::style as styles;
@@ -29,6 +33,7 @@ struct RBoard {
     engine_path: EnginePaths,
 
     show_engine_manager: bool,
+    engine_table_info: EngineTable,
 }
 
 impl RBoard {
@@ -52,16 +57,36 @@ impl RBoard {
             Message::AddEngige(result) => match result {
                 Some(path) => {
                     let path = path.path().to_path_buf();
-                    self.engine_path.add(path);
+                    let _ = self.engine_path.add(path);
+                    self.engine_table_info
+                        .change_data(self.engine_path.get_all_paths());
                 }
                 None => {
                     eprintln!("Error adding engine path");
                 }
             },
-            _ => {}
             Message::OpenEngineManager => {
+                self.engine_table_info
+                    .change_data(self.engine_path.get_all_paths());
                 self.show_engine_manager = true;
             }
+            Message::CloseEngineManager => self.show_engine_manager = false,
+            Message::ChangeEngineName(index, name) => {
+                let _ = self.engine_path.change_name(index, name);
+                self.engine_table_info
+                    .change_data(self.engine_path.get_all_paths());
+            }
+            Message::ChangeEngineArgs(index, args) => {
+                let _ = self.engine_path.change_args(index, args);
+                self.engine_table_info
+                    .change_data(self.engine_path.get_all_paths());
+            }
+            Message::DeleteEngine(index) => {
+                let _ = self.engine_path.delete(index);
+                self.engine_table_info
+                    .change_data(self.engine_path.get_all_paths());
+            }
+            _ => {}
         }
         iced::Task::none()
     }
@@ -97,7 +122,20 @@ impl RBoard {
             menu_template(engine_path).max_width(e_len as f32 * 10.0)
             )
         ).spacing(10.0);
-
+        //colunm
+        let engine_table = responsive(|size| {
+            let engine_tables = table(
+                self.engine_table_info.header.clone(),
+                self.engine_table_info.body.clone(),
+                &self.engine_table_info.columns,
+                &self.engine_table_info.rows,
+                Message::EngineTableSyncHeader,
+            )
+            .footer(self.engine_table_info.footer.clone())
+            .min_width(size.width);
+            engine_tables.into()
+        });
+        //board-
         let board = canvas(Board {
             count: self.board_state.chessboard.get_length(),
             pieces: self.board_state.chessboard.get_pieces(),
@@ -112,6 +150,15 @@ impl RBoard {
                 .width(2.0),
         });
         // Render the chessboard and pieces
-        column![menu_bar, board, rate].padding(10).spacing(5).into()
+        let mut main_view = Column::new().push(menu_bar);
+        if self.show_engine_manager {
+            main_view = main_view.push(engine_table);
+        }
+        main_view
+            .push(board)
+            .push(rate)
+            .padding(10)
+            .spacing(5)
+            .into()
     }
 }

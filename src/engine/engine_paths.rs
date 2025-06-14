@@ -62,6 +62,30 @@ impl EnginePaths {
     pub fn get_all_paths(&self) -> Vec<EngineArgs> {
         self.paths.clone()
     }
+    pub fn change_name(&mut self, index: usize, name: String) -> Result<(), String> {
+        if index < self.paths.len() {
+            self.paths[index].name = name;
+            self.save()
+        } else {
+            Err("index out of bounds".to_string())
+        }
+    }
+    pub fn change_args(&mut self, index: usize, args: String) -> Result<(), String> {
+        if index < self.paths.len() {
+            self.paths[index].args = args;
+            self.save()
+        } else {
+            Err("index out of bounds".to_string())
+        }
+    }
+    pub fn delete(&mut self, index: usize) -> Result<(), String> {
+        if index < self.paths.len() {
+            self.paths.remove(index);
+            self.save()
+        } else {
+            Err("index out of bounds".to_string())
+        }
+    }
 }
 
 impl Default for EnginePaths {

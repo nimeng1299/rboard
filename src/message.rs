@@ -1,3 +1,4 @@
+use iced::widget::scrollable;
 use rfd::FileHandle;
 
 #[derive(Debug, Clone)]
@@ -8,4 +9,9 @@ pub enum Message {
     AddEngige(Option<FileHandle>),
     ChangeEngine(String),
     OpenEngineManager,
+    CloseEngineManager,
+    EngineTableSyncHeader(scrollable::AbsoluteOffset),
+    ChangeEngineName(usize, String),
+    ChangeEngineArgs(usize, String),
+    DeleteEngine(usize),
 }
