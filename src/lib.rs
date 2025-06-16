@@ -6,22 +6,23 @@ pub mod style;
 
 use std::sync::Arc;
 
-use iced::widget::{Column, Row, canvas, column, progress_bar, responsive, text};
+use iced::widget::{Column, Row, canvas, column, progress_bar, responsive, row, text};
 use iced::{Background, Border, Color, Font, Length, Task};
 use iced_aw::menu::{Item, Menu};
-use iced_aw::{menu_bar, menu_items};
+use iced_aw::{menu_bar, menu_items, selection_list};
 use iced_table::table;
 use rfd::AsyncFileDialog;
 
 use crate::board::{Board, BoardState};
 use crate::engine::engine_paths::EnginePaths;
 use crate::engine::engine_table::{self, EngineTable};
+use crate::engine::gtp::GTP;
 use crate::message::Message;
 
 use crate::style as styles;
 
 pub fn start() -> iced::Result {
-    iced::application("rboard", RBoard::update, RBoard::view)
+    iced::application(RBoard::title, RBoard::update, RBoard::view)
         .font(include_bytes!("E:\\85W.ttf"))
         .default_font(Font::with_name("汉仪文黑"))
         .run()
@@ -34,6 +35,10 @@ struct RBoard {
 
     show_engine_manager: bool,
     engine_table_info: EngineTable,
+
+    engine: Option<GTP>,
+    engine_msg: Vec<String>,
+    engine_analyze: String,
 }
 
 impl RBoard {
@@ -86,8 +91,42 @@ impl RBoard {
                 self.engine_table_info
                     .change_data(self.engine_path.get_all_paths());
             }
+            Message::ChangeEngine(index) => {
+                let args = self.engine_path.get_all_paths()[index].clone();
+                let gtp = GTP::start(&args.path.as_str(), &args.args.as_str());
+                match gtp {
+                    Ok(gtp) => {
+                        let _ = gtp.send_command("name".to_string());
+                        let _ = gtp.send_command("version".to_string());
+                        let _ = gtp.send_command("list_commands".to_string());
+                        let (x, _) = self.board_state.chessboard.get_length();
+                        let _ = gtp.send_command(format!("boardsize {}", x));
+                        let _ = gtp.send_command("kata-get-rules".to_string());
+                        let _ = gtp.send_kata_analyze();
+                        self.engine = Some(gtp);
+                        self.engine_path.current_path = Some(index as i32);
+                    }
+                    Err(e) => {
+                        println!("gtp load err: {}", e);
+                        self.engine_path.current_path = None;
+                    }
+                }
+                self.engine_msg = vec![];
+            }
             _ => {}
         }
+        if let Some(gtp) = self.engine.take() {
+            let data_clone = Arc::clone(&gtp.data);
+            if let Ok(mut lock) = data_clone.try_lock() {
+                while let Some(item) = lock.pop_front() {
+                    if !item.starts_with("info") {
+                        self.engine_msg.push(item);
+                    }
+                }
+            }
+            self.engine = Some(gtp);
+        }
+
         iced::Task::none()
     }
 
@@ -96,12 +135,12 @@ impl RBoard {
         let mut engine_path = vec![];
         let e_p = self.engine_path.get_all_paths();
         let mut e_len = 15;
-        for i in e_p {
-            let s = i.path.clone();
+        for i in 0..e_p.len() {
+            let s = e_p[i].path.clone();
             e_len = e_len.max(s.len());
             engine_path.push(Item::new(styles::button::secondary_menu_button(
                 text(s.clone()),
-                Message::ChangeEngine(s.clone()),
+                Message::ChangeEngine(i),
             )));
         }
         engine_path.push(Item::new(styles::button::secondary_menu_button(
@@ -142,6 +181,19 @@ impl RBoard {
         })
         .width(Length::Fill)
         .height(Length::Fill);
+
+        let start_index = self.engine_msg.len().saturating_sub(100);
+        let engine_output = selection_list::SelectionList::new_with(
+            &self.engine_msg[start_index..],
+            Message::EngineOutputSelected,
+            12.0,
+            3.0,
+            iced_aw::style::selection_list::primary,
+            None,
+            Font::with_name("汉仪文黑"),
+        )
+        .width(250.0);
+
         let rate = progress_bar(0.0..=100.0, 35.0).style(|_| progress_bar::Style {
             background: Background::Color(Color::WHITE),
             bar: Background::Color(Color::BLACK),
@@ -155,10 +207,17 @@ impl RBoard {
             main_view = main_view.push(engine_table);
         }
         main_view
-            .push(board)
+            .push(row![board, engine_output].spacing(5.0))
             .push(rate)
             .padding(10)
             .spacing(5)
             .into()
+    }
+    fn title(&self) -> String {
+        if let Some(i) = self.engine_path.current_path {
+            format!("RBoard - {}", self.engine_path.paths[i as usize].name)
+        } else {
+            "RBoard".to_string()
+        }
     }
 }

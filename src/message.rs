@@ -7,11 +7,12 @@ pub enum Message {
     GoBoard(i32, i32),
     AddEngineButton,
     AddEngige(Option<FileHandle>),
-    ChangeEngine(String),
+    ChangeEngine(usize),
     OpenEngineManager,
     CloseEngineManager,
     EngineTableSyncHeader(scrollable::AbsoluteOffset),
     ChangeEngineName(usize, String),
     ChangeEngineArgs(usize, String),
     DeleteEngine(usize),
+    EngineOutputSelected(usize, String),
 }

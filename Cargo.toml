@@ -5,7 +5,8 @@ edition = "2024"
 
 [dependencies]
 iced = {version = "0.13.1", features = ["canvas", "lazy"]}
-iced_aw = { version = "0.12.2", default-features = false, features = ["menu"] }
+iced_aw = { version = "0.12.2", default-features = false, features = ["menu", "selection_list"] }
 iced_table = "0.13.0"
 rfd = "0.15.3"
 json = "0.12.4"
+subprocess = "0.2.9"

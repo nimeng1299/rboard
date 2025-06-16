@@ -1,1 +1,1 @@
-{"paths":[{"path":"C:\\Users\\lumine\\Downloads\\zed.exe","args":"67","name":"786"}]}
+{"paths":[{"path":"C:\\Users\\lumine\\Downloads\\Katagomo\\katago\\engine\\renju.exe","args":"gtp -model C:\\Users\\lumine\\Downloads\\Katagomo\\weights\\renju.bin.gz -config C:\\Users\\lumine\\Downloads\\Katagomo\\katago\\default.cfg","name":"renju"}]}
