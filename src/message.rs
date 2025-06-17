@@ -15,4 +15,6 @@ pub enum Message {
     ChangeEngineArgs(usize, String),
     DeleteEngine(usize),
     EngineOutputSelected(usize, String),
+    EngineSender(std::sync::mpsc::Sender<String>),
+    EngineReceiveOutput(String),
 }

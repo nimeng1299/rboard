@@ -4,13 +4,12 @@ pub mod engine;
 pub mod message;
 pub mod style;
 
-use std::sync::{Arc, Mutex};
-use std::thread::{self, Thread};
-use std::time::Duration;
+use std::sync::Arc;
 
-use iced::futures::{self, Stream, stream};
-use iced::widget::{Column, Row, canvas, column, progress_bar, responsive, row, text};
-use iced::{Background, Border, Color, Font, Length, Subscription, Task, time};
+use iced::futures::channel::mpsc;
+use iced::futures::{self, SinkExt, Stream, stream};
+use iced::widget::{Column, canvas, progress_bar, responsive, row, text};
+use iced::{Background, Border, Color, Font, Length, Subscription, Task};
 use iced_aw::menu::{Item, Menu};
 use iced_aw::{menu_bar, menu_items, selection_list};
 use iced_table::table;
@@ -26,6 +25,7 @@ use crate::style as styles;
 
 pub fn start() -> iced::Result {
     iced::application(RBoard::title, RBoard::update, RBoard::view)
+        .subscription(RBoard::subscription)
         .font(include_bytes!("E:\\85W.ttf"))
         .default_font(Font::with_name("汉仪文黑"))
         .run()
@@ -43,12 +43,11 @@ struct RBoard {
     engine_analyze: String,
 
     engine_tx: Arc<std::sync::mpsc::Sender<String>>,
-    engine_rx: Arc<std::sync::mpsc::Receiver<String>>,
 }
 
 impl Default for RBoard {
     fn default() -> Self {
-        let (engine_tx, engine_rx) = std::sync::mpsc::channel::<String>();
+        let (tx, _) = std::sync::mpsc::channel::<String>();
         // let engine_output_handle = thread::spawn(move || {
         //     loop {
         //         if let Ok(mut m_gtp) = engine_clone.try_lock() {
@@ -77,8 +76,7 @@ impl Default for RBoard {
             engine: None,
             engine_msg: Vec::new(),
             engine_analyze: String::new(),
-            engine_tx: Arc::new(engine_tx),
-            engine_rx: Arc::new(engine_rx),
+            engine_tx: Arc::new(tx),
         }
     }
 }
@@ -135,6 +133,7 @@ impl RBoard {
             }
             Message::ChangeEngine(index) => {
                 let args = self.engine_path.get_all_paths()[index].clone();
+
                 let gtp = GTP::start(
                     &args.path.as_str(),
                     &args.args.as_str(),
@@ -158,6 +157,17 @@ impl RBoard {
                     }
                 }
                 self.engine_msg = vec![];
+            }
+            Message::EngineSender(sender) => {
+                println!("change sender!");
+                self.engine_tx = Arc::new(sender);
+            }
+            Message::EngineReceiveOutput(data) => {
+                if data.starts_with("info") {
+                    self.engine_analyze = data;
+                } else {
+                    self.engine_msg.push(data);
+                }
             }
             _ => {}
         }
@@ -249,6 +259,10 @@ impl RBoard {
             .into()
     }
 
+    fn subscription(&self) -> Subscription<Message> {
+        Subscription::run(get_data)
+    }
+
     fn title(&self) -> String {
         if let Some(i) = self.engine_path.current_path {
             format!("RBoard - {}", self.engine_path.paths[i as usize].name)
@@ -256,4 +270,14 @@ impl RBoard {
             "RBoard".to_string()
         }
     }
+}
+
+fn get_data() -> impl Stream<Item = Message> {
+    iced::stream::channel(100, |mut output| async move {
+        let (sender, receiver) = std::sync::mpsc::channel::<String>();
+        let _ = output.send(Message::EngineSender(sender)).await;
+        for str in receiver {
+            let _ = output.send(Message::EngineReceiveOutput(str)).await;
+        }
+    })
 }
