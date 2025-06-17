@@ -4,10 +4,13 @@ pub mod engine;
 pub mod message;
 pub mod style;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::thread::{self, Thread};
+use std::time::Duration;
 
+use iced::futures::{self, Stream, stream};
 use iced::widget::{Column, Row, canvas, column, progress_bar, responsive, row, text};
-use iced::{Background, Border, Color, Font, Length, Task};
+use iced::{Background, Border, Color, Font, Length, Subscription, Task, time};
 use iced_aw::menu::{Item, Menu};
 use iced_aw::{menu_bar, menu_items, selection_list};
 use iced_table::table;
@@ -28,7 +31,6 @@ pub fn start() -> iced::Result {
         .run()
 }
 
-#[derive(Default)]
 struct RBoard {
     board_state: BoardState,
     engine_path: EnginePaths,
@@ -39,6 +41,46 @@ struct RBoard {
     engine: Option<GTP>,
     engine_msg: Vec<String>,
     engine_analyze: String,
+
+    engine_tx: Arc<std::sync::mpsc::Sender<String>>,
+    engine_rx: Arc<std::sync::mpsc::Receiver<String>>,
+}
+
+impl Default for RBoard {
+    fn default() -> Self {
+        let (engine_tx, engine_rx) = std::sync::mpsc::channel::<String>();
+        // let engine_output_handle = thread::spawn(move || {
+        //     loop {
+        //         if let Ok(mut m_gtp) = engine_clone.try_lock() {
+        //             if let Some(gtp) = m_gtp.take() {
+        //                 let data_clone = Arc::clone(&gtp.data);
+        //                 if let Ok(mut lock) = data_clone.try_lock() {
+        //                     while let Some(item) = lock.pop_front() {
+        //                         if !item.starts_with("info") {
+        //                             engine_msg_clone.lock().unwrap().push(item);
+        //                         } else {
+        //                             *engine_analyze_clone.lock().unwrap() = item;
+        //                         }
+        //                     }
+        //                 }
+        //                 *m_gtp = Some(gtp);
+        //             }
+        //         }
+        //         thread::sleep(Duration::from_millis(10));
+        //     }
+        // });
+        Self {
+            board_state: Default::default(),
+            engine_path: Default::default(),
+            show_engine_manager: false,
+            engine_table_info: Default::default(),
+            engine: None,
+            engine_msg: Vec::new(),
+            engine_analyze: String::new(),
+            engine_tx: Arc::new(engine_tx),
+            engine_rx: Arc::new(engine_rx),
+        }
+    }
 }
 
 impl RBoard {
@@ -93,7 +135,11 @@ impl RBoard {
             }
             Message::ChangeEngine(index) => {
                 let args = self.engine_path.get_all_paths()[index].clone();
-                let gtp = GTP::start(&args.path.as_str(), &args.args.as_str());
+                let gtp = GTP::start(
+                    &args.path.as_str(),
+                    &args.args.as_str(),
+                    Arc::clone(&self.engine_tx),
+                );
                 match gtp {
                     Ok(gtp) => {
                         let _ = gtp.send_command("name".to_string());
@@ -114,17 +160,6 @@ impl RBoard {
                 self.engine_msg = vec![];
             }
             _ => {}
-        }
-        if let Some(gtp) = self.engine.take() {
-            let data_clone = Arc::clone(&gtp.data);
-            if let Ok(mut lock) = data_clone.try_lock() {
-                while let Some(item) = lock.pop_front() {
-                    if !item.starts_with("info") {
-                        self.engine_msg.push(item);
-                    }
-                }
-            }
-            self.engine = Some(gtp);
         }
 
         iced::Task::none()
@@ -213,6 +248,7 @@ impl RBoard {
             .spacing(5)
             .into()
     }
+
     fn title(&self) -> String {
         if let Some(i) = self.engine_path.current_path {
             format!("RBoard - {}", self.engine_path.paths[i as usize].name)

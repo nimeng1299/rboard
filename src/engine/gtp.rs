@@ -1,11 +1,6 @@
 use std::{
-    collections::VecDeque,
     io::{BufRead, BufReader, Write},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-        mpsc::channel,
-    },
+    sync::{Arc, mpsc::channel},
     thread,
 };
 
@@ -16,18 +11,17 @@ pub struct GTP {
     child: Popen,
     cmd_handler: Option<thread::JoinHandle<()>>,
     output_handler: Option<thread::JoinHandle<()>>,
-    pub data: Arc<Mutex<VecDeque<String>>>,
-    is_exit: Arc<AtomicBool>,
+    data_tx: Arc<std::sync::mpsc::Sender<String>>,
 }
 
 impl GTP {
-    pub fn start(engine_path: &str, engine_args: &str) -> Result<Self, String> {
+    pub fn start(
+        engine_path: &str,
+        engine_args: &str,
+        data_tx: Arc<std::sync::mpsc::Sender<String>>,
+    ) -> Result<Self, String> {
         let (cmd_tx, cmd_rx) = channel::<String>();
 
-        let data = Arc::new(Mutex::new(VecDeque::<String>::new()));
-        let is_exit = Arc::new(AtomicBool::new(false));
-        let cmd_exit = Arc::clone(&is_exit);
-        let output_exit = Arc::clone(&is_exit);
         let mut child = spawn_child_process(engine_path, engine_args)
             .map_err(|err| format!("无法启动进程: {}", err))?;
         debug(format!("子进程已启动 (PID: {})", child.pid().unwrap_or(0)));
@@ -50,6 +44,9 @@ impl GTP {
         // 启动命令发送线程
         let cmd_handler = thread::spawn(move || {
             for command in cmd_rx {
+                if command == "rboard gtp exit".to_string() {
+                    break;
+                }
                 if let Err(e) = stdin.write_all(format!("{}\n", command).as_bytes()) {
                     eprintln!("写入命令失败: {}", e);
                     break;
@@ -58,30 +55,25 @@ impl GTP {
                     eprintln!("刷新输入失败: {}", e);
                     break;
                 }
-                if cmd_exit.load(Ordering::Relaxed) {
-                    break;
-                }
             }
             eprintln!("命令线程已退出");
         });
 
-        let outdata = Arc::clone(&data);
-        let errdata = Arc::clone(&data);
+        let data_tx_clone = Arc::clone(&data_tx);
         // 启动输出读取线程
         let output_handler = thread::spawn(move || {
-            let out_exit = Arc::clone(&output_exit);
-            let err_exit = Arc::clone(&output_exit);
+            let data_tx_out = Arc::clone(&data_tx_clone);
+            let data_tx_err = Arc::clone(&data_tx_clone);
             // 使用两个线程分别读取 stdout 和 stderr
             let stdout_thread = thread::spawn(move || {
                 let reader = BufReader::new(stdout);
                 for line in reader.lines() {
                     match line {
-                        Ok(output) => outdata.lock().unwrap().push_back(output),
+                        Ok(output) => {
+                            let _ = data_tx_out.send(output);
+                        }
 
                         Err(e) => edebug(format!("读取输出错误: {}", e)),
-                    }
-                    if out_exit.load(Ordering::Relaxed) {
-                        break;
                     }
                 }
             });
@@ -90,11 +82,10 @@ impl GTP {
                 let reader = BufReader::new(stderr);
                 for line in reader.lines() {
                     match line {
-                        Ok(err) => errdata.lock().unwrap().push_back(err),
+                        Ok(err) => {
+                            let _ = data_tx_err.send(err);
+                        }
                         Err(e) => edebug(format!("读取错误输出错误: {}", e)),
-                    }
-                    if err_exit.load(Ordering::Relaxed) {
-                        break;
                     }
                 }
             });
@@ -109,8 +100,7 @@ impl GTP {
             child,
             cmd_handler: Some(cmd_handler),
             output_handler: Some(output_handler),
-            data,
-            is_exit,
+            data_tx,
         })
     }
 
@@ -127,7 +117,7 @@ impl GTP {
     pub fn exit(&mut self) -> Result<(), String> {
         let _ = self
             .cmd_tx
-            .send("quit".to_string())
+            .send("rboard gtp exit".to_string())
             .map_err(|e| e.to_string());
         if let Some(_) = self.child.poll() {
             debug("子进程已退出".to_string());
@@ -137,7 +127,9 @@ impl GTP {
                 edebug(format!("终止子进程失败: {}", e));
             }
         }
-        self.is_exit.store(true, Ordering::SeqCst);
+
+        let _ = self.child.kill();
+
         if let Some(handler) = self.cmd_handler.take() {
             debug("终止子进程 cmd_handler ...".to_string());
             let _ = handler.join();
