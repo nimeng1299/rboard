@@ -46,12 +46,16 @@ impl ChessboardTrait for Gomoku {
             return None;
         }
         self.board[x as usize][y as usize] = self.current_player;
-        self.current_player = 1 - self.current_player;
         let p = if self.current_player == 0 { "B" } else { "W" };
+        self.current_player = 1 - self.current_player;
+        let mut p_x = x;
+        if p_x >= 'I' as i32 - 'A' as i32 {
+            p_x = p_x + 1;
+        }
         Some(format!(
-            "paly {} {}{})",
+            "play {} {}{}",
             p,
-            ('A' as i32 + x) as u8 as char,
+            ('A' as i32 + p_x) as u8 as char,
             15 - y
         ))
     }

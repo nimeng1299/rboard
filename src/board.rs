@@ -1,4 +1,4 @@
-use std::cmp::max;
+use std::{cmp::max, sync::Arc};
 
 use iced::{
     Color, Point, Renderer, Theme,
@@ -7,13 +7,16 @@ use iced::{
 };
 
 use crate::{
-    chessboard::{chessboard_trait::ChessboardTrait, get_chessboard},
+    chessboard::{chessboard_trait::ChessboardTrait, get_chessboard, get_piece},
+    engine::analyze::Analyzes,
     message::Message,
 };
 
 pub struct Board {
     pub count: (u32, u32),
     pub pieces: Vec<Vec<Option<(Color, Color)>>>,
+    //引擎输出
+    pub analyzes: Arc<Analyzes>,
 }
 
 impl canvas::Program<Message> for Board {
@@ -67,7 +70,11 @@ impl canvas::Program<Message> for Board {
         }
 
         for i in 0..x {
-            let label = (b'A' + i as u8) as char;
+            let mut b_x = i;
+            if i >= 'I' as u32 - 'A' as u32 {
+                b_x = b_x + 1;
+            }
+            let label = (b'A' + b_x as u8) as char;
 
             let label_size = match label {
                 'i' | 'I' | 'J' => 0.2,
@@ -149,6 +156,53 @@ impl canvas::Program<Message> for Board {
                 }
             }
         }
+
+        //画预测棋子
+        for i in 0..self.analyzes.datas.len() {
+            let data = &self.analyzes.datas[i];
+            let (size_x, size_y) = self.count;
+            if let Some((x1, y1)) = get_piece(&data.move_, size_x, size_y, true) {
+                if i == 0 {
+                    //best move
+                    let x = x_padding + x1 as f32 * size + size / 2.0;
+                    let y = y_padding + y1 as f32 * size + size / 2.0;
+                    let center = iced::Point::new(x, y);
+                    let circle = canvas::Path::circle(center, size / 2.0);
+                    frame.fill(&circle, Color::from_rgba8(25, 118, 210, 0.7));
+                    frame.stroke(
+                        &circle,
+                        Stroke::default()
+                            .with_color(Color::from_rgba8(241, 9, 9, 1.0))
+                            .with_width(2.0),
+                    );
+                } else if data.winrate > 0.7 {
+                    let x = x_padding + x1 as f32 * size + size / 2.0;
+                    let y = y_padding + y1 as f32 * size + size / 2.0;
+                    let center = iced::Point::new(x, y);
+                    let circle = canvas::Path::circle(center, size / 2.0);
+                    frame.fill(&circle, Color::from_rgba8(187, 222, 251, 0.7));
+                    frame.stroke(
+                        &circle,
+                        Stroke::default()
+                            .with_color(Color::from_rgba8(241, 9, 9, 1.0))
+                            .with_width(2.0),
+                    );
+                } else {
+                    let x = x_padding + x1 as f32 * size + size / 2.0;
+                    let y = y_padding + y1 as f32 * size + size / 2.0;
+                    let center = iced::Point::new(x, y);
+                    let circle = canvas::Path::circle(center, size / 2.0);
+                    frame.fill(&circle, Color::from_rgba8(255, 205, 210, 0.7));
+                    frame.stroke(
+                        &circle,
+                        Stroke::default()
+                            .with_color(Color::from_rgba8(241, 9, 9, 1.0))
+                            .with_width(2.0),
+                    );
+                }
+            }
+        }
+
         vec![frame.into_geometry()]
     }
 

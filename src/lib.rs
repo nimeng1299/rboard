@@ -4,11 +4,10 @@ pub mod engine;
 pub mod message;
 pub mod style;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use iced::futures::channel::mpsc;
-use iced::futures::{self, SinkExt, Stream, stream};
-use iced::widget::{Column, canvas, progress_bar, responsive, row, text};
+use iced::futures::{self, SinkExt, Stream, StreamExt};
+use iced::widget::{Column, canvas, column, progress_bar, responsive, row, text};
 use iced::{Background, Border, Color, Font, Length, Subscription, Task};
 use iced_aw::menu::{Item, Menu};
 use iced_aw::{menu_bar, menu_items, selection_list};
@@ -16,8 +15,10 @@ use iced_table::table;
 use rfd::AsyncFileDialog;
 
 use crate::board::{Board, BoardState};
+use crate::engine::analyze::{Analyze, Analyzes};
+use crate::engine::analyzes_table::AnalyzesTable;
 use crate::engine::engine_paths::EnginePaths;
-use crate::engine::engine_table::{self, EngineTable};
+use crate::engine::engine_table::EngineTable;
 use crate::engine::gtp::GTP;
 use crate::message::Message;
 
@@ -42,32 +43,16 @@ struct RBoard {
     engine_msg: Vec<String>,
     engine_analyze: String,
 
-    engine_tx: Arc<std::sync::mpsc::Sender<String>>,
+    engine_tx: Arc<Mutex<iced::futures::channel::mpsc::Sender<String>>>,
+
+    engine_analyzes_table: AnalyzesTable,
+    analyzes: Arc<Analyzes>,
 }
 
 impl Default for RBoard {
     fn default() -> Self {
-        let (tx, _) = std::sync::mpsc::channel::<String>();
-        // let engine_output_handle = thread::spawn(move || {
-        //     loop {
-        //         if let Ok(mut m_gtp) = engine_clone.try_lock() {
-        //             if let Some(gtp) = m_gtp.take() {
-        //                 let data_clone = Arc::clone(&gtp.data);
-        //                 if let Ok(mut lock) = data_clone.try_lock() {
-        //                     while let Some(item) = lock.pop_front() {
-        //                         if !item.starts_with("info") {
-        //                             engine_msg_clone.lock().unwrap().push(item);
-        //                         } else {
-        //                             *engine_analyze_clone.lock().unwrap() = item;
-        //                         }
-        //                     }
-        //                 }
-        //                 *m_gtp = Some(gtp);
-        //             }
-        //         }
-        //         thread::sleep(Duration::from_millis(10));
-        //     }
-        // });
+        let (tx, _) = futures::channel::mpsc::channel::<String>(100);
+
         Self {
             board_state: Default::default(),
             engine_path: Default::default(),
@@ -76,7 +61,9 @@ impl Default for RBoard {
             engine: None,
             engine_msg: Vec::new(),
             engine_analyze: String::new(),
-            engine_tx: Arc::new(tx),
+            engine_tx: Arc::new(Mutex::new(tx)),
+            engine_analyzes_table: Default::default(),
+            analyzes: Default::default(),
         }
     }
 }
@@ -85,10 +72,23 @@ impl RBoard {
     fn update(&mut self, message: Message) -> iced::Task<Message> {
         match message {
             Message::GoBoard(x, y) => {
-                self.board_state.chessboard.go(x, y);
+                if let Some(cmd) = self.board_state.chessboard.go(x, y) {
+                    if let Some(gtp) = self.engine.take() {
+                        println!("cmd: {}", cmd);
+                        let _ = gtp.send_command(cmd);
+                        let _ = gtp.send_kata_analyze();
+                        self.engine = Some(gtp);
+                    }
+                }
             }
             Message::NewBoard => {
                 self.board_state.chessboard.new_board();
+                if let Some(gtp) = self.engine.take() {
+                    let _ = gtp.send_command("stop".to_string());
+                    let _ = gtp.send_command("clear_board".to_string());
+                    let _ = gtp.send_kata_analyze();
+                    self.engine = Some(gtp);
+                }
             }
             Message::AddEngineButton => {
                 return Task::perform(
@@ -160,11 +160,14 @@ impl RBoard {
             }
             Message::EngineSender(sender) => {
                 println!("change sender!");
-                self.engine_tx = Arc::new(sender);
+                self.engine_tx = Arc::new(Mutex::new(sender));
             }
             Message::EngineReceiveOutput(data) => {
                 if data.starts_with("info") {
                     self.engine_analyze = data;
+                    let analyzes = Analyzes::from_string(&self.engine_analyze);
+                    self.engine_analyzes_table.rows = analyzes.datas.clone();
+                    self.analyzes = Arc::new(analyzes);
                 } else {
                     self.engine_msg.push(data);
                 }
@@ -219,13 +222,28 @@ impl RBoard {
             .min_width(size.width);
             engine_tables.into()
         });
+
         //board-
         let board = canvas(Board {
             count: self.board_state.chessboard.get_length(),
             pieces: self.board_state.chessboard.get_pieces(),
+            analyzes: Arc::clone(&self.analyzes),
         })
         .width(Length::Fill)
         .height(Length::Fill);
+
+        //analyze table
+        let analyze_table = responsive(|size| {
+            let analyze_table = table(
+                self.engine_analyzes_table.header.clone(),
+                self.engine_analyzes_table.body.clone(),
+                &self.engine_analyzes_table.columns,
+                &self.engine_analyzes_table.rows,
+                Message::EngineTableSyncHeader,
+            )
+            .min_width(size.width);
+            analyze_table.into()
+        });
 
         let start_index = self.engine_msg.len().saturating_sub(100);
         let engine_output = selection_list::SelectionList::new_with(
@@ -252,8 +270,12 @@ impl RBoard {
             main_view = main_view.push(engine_table);
         }
         main_view
-            .push(row![board, engine_output].spacing(5.0))
-            .push(rate)
+            .push(
+                row![column![rate, engine_output].spacing(5.0).width(250), board]
+                    .spacing(5.0)
+                    .height(Length::Fill),
+            )
+            .push(column![analyze_table].height(100.0))
             .padding(10)
             .spacing(5)
             .into()
@@ -273,11 +295,11 @@ impl RBoard {
 }
 
 fn get_data() -> impl Stream<Item = Message> {
-    iced::stream::channel(100, |mut output| async move {
-        let (sender, receiver) = std::sync::mpsc::channel::<String>();
+    iced::stream::channel(1000, |mut output| async move {
+        let (sender, mut receiver) = iced::futures::channel::mpsc::channel::<String>(1000);
         let _ = output.send(Message::EngineSender(sender)).await;
-        for str in receiver {
-            let _ = output.send(Message::EngineReceiveOutput(str)).await;
+        while let input = receiver.select_next_some().await {
+            let _ = output.send(Message::EngineReceiveOutput(input)).await;
         }
     })
 }

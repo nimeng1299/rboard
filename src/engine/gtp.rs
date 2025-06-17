@@ -1,9 +1,10 @@
 use std::{
     io::{BufRead, BufReader, Write},
-    sync::{Arc, mpsc::channel},
+    sync::{Arc, Mutex},
     thread,
 };
 
+use iced::futures::{SinkExt, executor::block_on};
 use subprocess::{Exec, Popen, PopenError, Redirection};
 
 pub struct GTP {
@@ -11,16 +12,15 @@ pub struct GTP {
     child: Popen,
     cmd_handler: Option<thread::JoinHandle<()>>,
     output_handler: Option<thread::JoinHandle<()>>,
-    data_tx: Arc<std::sync::mpsc::Sender<String>>,
 }
 
 impl GTP {
     pub fn start(
         engine_path: &str,
         engine_args: &str,
-        data_tx: Arc<std::sync::mpsc::Sender<String>>,
+        data_tx: Arc<Mutex<iced::futures::channel::mpsc::Sender<String>>>,
     ) -> Result<Self, String> {
-        let (cmd_tx, cmd_rx) = channel::<String>();
+        let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<String>();
 
         let mut child = spawn_child_process(engine_path, engine_args)
             .map_err(|err| format!("无法启动进程: {}", err))?;
@@ -70,7 +70,7 @@ impl GTP {
                 for line in reader.lines() {
                     match line {
                         Ok(output) => {
-                            let _ = data_tx_out.send(output);
+                            let _ = block_on(data_tx_out.lock().unwrap().send(output));
                         }
 
                         Err(e) => edebug(format!("读取输出错误: {}", e)),
@@ -83,7 +83,7 @@ impl GTP {
                 for line in reader.lines() {
                     match line {
                         Ok(err) => {
-                            let _ = data_tx_err.send(err);
+                            let _ = block_on(data_tx_err.lock().unwrap().send(err));
                         }
                         Err(e) => edebug(format!("读取错误输出错误: {}", e)),
                     }
@@ -100,7 +100,6 @@ impl GTP {
             child,
             cmd_handler: Some(cmd_handler),
             output_handler: Some(output_handler),
-            data_tx,
         })
     }
 
