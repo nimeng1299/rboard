@@ -244,6 +244,12 @@ pub struct BoardState {
     pub chessboard: Box<dyn ChessboardTrait>,
 }
 
+impl BoardState {
+    pub fn change_board(&mut self, name: String) {
+        self.chessboard = get_chessboard(name);
+    }
+}
+
 impl Default for BoardState {
     fn default() -> Self {
         BoardState {

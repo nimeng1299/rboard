@@ -15,6 +15,7 @@ use iced_table::table;
 use rfd::AsyncFileDialog;
 
 use crate::board::{Board, BoardState};
+use crate::chessboard::get_all_board_names;
 use crate::engine::analyze::{Analyze, Analyzes};
 use crate::engine::analyzes_table::AnalyzesTable;
 use crate::engine::engine_paths::EnginePaths;
@@ -90,6 +91,9 @@ impl RBoard {
                     self.engine = Some(gtp);
                 }
             }
+            Message::ChangeBoard(name) => {
+                self.board_state.change_board(name);
+            }
             Message::AddEngineButton => {
                 return Task::perform(
                     AsyncFileDialog::new()
@@ -134,6 +138,10 @@ impl RBoard {
             Message::ChangeEngine(index) => {
                 let args = self.engine_path.get_all_paths()[index].clone();
 
+                if let Some(mut engine) = self.engine.take() {
+                    let _ = engine.exit();
+                }
+
                 let gtp = GTP::start(
                     &args.path.as_str(),
                     &args.args.as_str(),
@@ -168,6 +176,13 @@ impl RBoard {
                     let analyzes = Analyzes::from_string(&self.engine_analyze);
                     self.engine_analyzes_table.rows = analyzes.datas.clone();
                     self.analyzes = Arc::new(analyzes);
+                } else if data.starts_with("Why you give a finished board here") {
+                    if let Some(gtp) = self.engine.take() {
+                        let _ = gtp.send_command("stop".to_string());
+                        self.engine = Some(gtp);
+                        self.analyzes = Arc::new(Default::default());
+                        self.engine_analyzes_table.rows = vec![];
+                    }
                 } else {
                     self.engine_msg.push(data);
                 }
@@ -195,6 +210,15 @@ impl RBoard {
             "引擎管理",
             Message::OpenEngineManager,
         )));
+
+        let mut all_board = vec![];
+        for (name, id) in get_all_board_names() {
+            all_board.push(Item::new(styles::button::secondary_menu_button(
+                text(name),
+                Message::ChangeBoard(id),
+            )));
+        }
+
         #[rustfmt::skip]
         let menu_bar = menu_bar!(
             (
@@ -203,6 +227,10 @@ impl RBoard {
                 (styles::button::secondary_menu_button("新棋盘", Message::NewBoard))
                 (styles::button::secondary_menu_button("添加引擎...", Message::AddEngineButton))
             ))
+            )
+            (
+            text("棋盘"),
+            menu_template(all_board).max_width(300.0)
             )
             (
             text("引擎"),

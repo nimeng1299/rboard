@@ -5,6 +5,7 @@ use rfd::FileHandle;
 pub enum Message {
     NewBoard,
     GoBoard(i32, i32),
+    ChangeBoard(String),
     AddEngineButton,
     AddEngige(Option<FileHandle>),
     ChangeEngine(usize),

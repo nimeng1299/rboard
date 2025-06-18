@@ -22,11 +22,15 @@ impl Analyzes {
                 }
             }
         }
+        if strs.len() > 0 {
+            datas.push(Analyze::from_strs(strs.clone()));
+            strs.clear();
+        }
         Self { datas }
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Analyze {
     pub move_: String,
     pub visits: u64,

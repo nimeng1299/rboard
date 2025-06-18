@@ -1,12 +1,23 @@
 pub mod chessboard_trait;
 pub mod gomoku;
+pub mod zhenqi;
 
 use crate::chessboard::chessboard_trait::ChessboardTrait;
 
 pub fn get_chessboard(name: String) -> Box<dyn ChessboardTrait> {
     match name.as_str() {
+        "gomoku" => Box::new(gomoku::Gomoku::new()),
+        "zhenqi" => Box::new(zhenqi::Zhenqi::new()),
         _ => Box::new(gomoku::Gomoku::new()),
     }
+}
+
+//(名字, 唯一名字)
+pub fn get_all_board_names() -> Vec<(String, String)> {
+    vec![
+        ("Gomoku 15 * 15".to_string(), "gomoku".to_string()),
+        ("Zhenqi 8 * 8".to_string(), "zhenqi".to_string()),
+    ]
 }
 
 //棋子转坐标 例如:B8 -> 1 , (y - 8)
