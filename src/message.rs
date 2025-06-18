@@ -19,4 +19,5 @@ pub enum Message {
     EngineOutputSelected(usize, String),
     EngineSender(iced::futures::channel::mpsc::Sender<String>),
     EngineReceiveOutput(String),
+    CloseEngine,
 }

@@ -105,7 +105,11 @@ impl RBoard {
             Message::ChangeBoard(name) => {
                 self.board_state.change_board(name);
                 if let Some(mut gtp) = self.engine.take() {
+                    let _ = gtp.send_command("stop".to_string());
                     let _ = gtp.exit();
+                    self.analyzes = Arc::new(Default::default());
+                    self.engine_analyzes_table.rows = vec![];
+                    self.engine_msg.clear();
                 }
             }
             Message::AddEngineButton => {
@@ -231,6 +235,15 @@ impl RBoard {
                     self.engine_msg.push(data);
                 }
             }
+            Message::CloseEngine => {
+                if let Some(mut gtp) = self.engine.take() {
+                    let _ = gtp.send_command("stop".to_string());
+                    let _ = gtp.exit();
+                    self.analyzes = Arc::new(Default::default());
+                    self.engine_analyzes_table.rows = vec![];
+                    self.engine_msg.clear();
+                }
+            }
             _ => {}
         }
 
@@ -257,6 +270,10 @@ impl RBoard {
         engine_path.push(Item::new(styles::button::secondary_menu_button(
             "添加引擎",
             Message::AddEngineButton,
+        )));
+        engine_path.push(Item::new(styles::button::secondary_menu_button(
+            "关闭引擎",
+            Message::CloseEngine,
         )));
 
         let mut all_board = vec![];
