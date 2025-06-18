@@ -7,19 +7,21 @@ pub mod style;
 use std::sync::{Arc, Mutex};
 
 use iced::futures::{self, SinkExt, Stream, StreamExt};
-use iced::widget::{Column, canvas, column, progress_bar, responsive, row, text};
+use iced::widget::{
+    Column, button, canvas, column, progress_bar, responsive, row, text, text_editor, text_input,
+};
 use iced::{Background, Border, Color, Font, Length, Subscription, Task};
 use iced_aw::menu::{Item, Menu};
-use iced_aw::{menu_bar, menu_items, selection_list};
+use iced_aw::{SelectionList, menu_bar, menu_items, selection_list};
 use iced_table::table;
 use rfd::AsyncFileDialog;
 
 use crate::board::{Board, BoardState};
+use crate::chessboard::chessboard_trait::Player;
 use crate::chessboard::get_all_board_names;
 use crate::engine::analyze::{Analyze, Analyzes};
 use crate::engine::analyzes_table::AnalyzesTable;
 use crate::engine::engine_paths::EnginePaths;
-use crate::engine::engine_table::EngineTable;
 use crate::engine::gtp::GTP;
 use crate::message::Message;
 
@@ -38,7 +40,9 @@ struct RBoard {
     engine_path: EnginePaths,
 
     show_engine_manager: bool,
-    engine_table_info: EngineTable,
+    engine_name_list: Vec<String>,
+    engine_setting_selected: Option<usize>,
+    engine_setting_arg_content: text_editor::Content,
 
     engine: Option<GTP>,
     engine_msg: Vec<String>,
@@ -48,6 +52,7 @@ struct RBoard {
 
     engine_analyzes_table: AnalyzesTable,
     analyzes: Arc<Analyzes>,
+    black_winrate: f64,
 }
 
 impl Default for RBoard {
@@ -58,13 +63,16 @@ impl Default for RBoard {
             board_state: Default::default(),
             engine_path: Default::default(),
             show_engine_manager: false,
-            engine_table_info: Default::default(),
+            engine_name_list: Vec::new(),
+            engine_setting_selected: None,
+            engine_setting_arg_content: Default::default(),
             engine: None,
             engine_msg: Vec::new(),
             engine_analyze: String::new(),
             engine_tx: Arc::new(Mutex::new(tx)),
             engine_analyzes_table: Default::default(),
             analyzes: Default::default(),
+            black_winrate: 50.0,
         }
     }
 }
@@ -89,10 +97,16 @@ impl RBoard {
                     let _ = gtp.send_command("clear_board".to_string());
                     let _ = gtp.send_kata_analyze();
                     self.engine = Some(gtp);
+                    self.analyzes = Arc::new(Default::default());
+                    self.engine_analyzes_table.rows = vec![];
+                    self.engine_msg.clear();
                 }
             }
             Message::ChangeBoard(name) => {
                 self.board_state.change_board(name);
+                if let Some(mut gtp) = self.engine.take() {
+                    let _ = gtp.exit();
+                }
             }
             Message::AddEngineButton => {
                 return Task::perform(
@@ -107,33 +121,55 @@ impl RBoard {
                 Some(path) => {
                     let path = path.path().to_path_buf();
                     let _ = self.engine_path.add(path);
-                    self.engine_table_info
-                        .change_data(self.engine_path.get_all_paths());
+                    self.engine_name_list = self
+                        .engine_path
+                        .paths
+                        .iter()
+                        .map(|e| e.name.clone())
+                        .collect::<Vec<String>>();
                 }
                 None => {
                     eprintln!("Error adding engine path");
                 }
             },
+            Message::ChangeEngineSettingSelectionList(i, _) => {
+                self.engine_setting_selected = Some(i);
+                let s = self.engine_path.paths[i].clone();
+                self.engine_setting_arg_content = text_editor::Content::with_text(&s.args);
+            }
             Message::OpenEngineManager => {
-                self.engine_table_info
-                    .change_data(self.engine_path.get_all_paths());
+                self.engine_name_list = self
+                    .engine_path
+                    .paths
+                    .iter()
+                    .map(|e| e.name.clone())
+                    .collect::<Vec<String>>();
+                self.engine_setting_arg_content = text_editor::Content::with_text("");
                 self.show_engine_manager = true;
             }
             Message::CloseEngineManager => self.show_engine_manager = false,
             Message::ChangeEngineName(index, name) => {
                 let _ = self.engine_path.change_name(index, name);
-                self.engine_table_info
-                    .change_data(self.engine_path.get_all_paths());
+                self.engine_name_list = self
+                    .engine_path
+                    .paths
+                    .iter()
+                    .map(|e| e.name.clone())
+                    .collect::<Vec<String>>();
             }
-            Message::ChangeEngineArgs(index, args) => {
-                let _ = self.engine_path.change_args(index, args);
-                self.engine_table_info
-                    .change_data(self.engine_path.get_all_paths());
+            Message::ChangeEngineArgs(index, action) => {
+                self.engine_setting_arg_content.perform(action.clone());
+                if let text_editor::Action::Edit(_) = action {
+                    let _ = self
+                        .engine_path
+                        .change_args(index, self.engine_setting_arg_content.text());
+                }
             }
-            Message::DeleteEngine(index) => {
-                let _ = self.engine_path.delete(index);
-                self.engine_table_info
-                    .change_data(self.engine_path.get_all_paths());
+            Message::DeleteEngine => {
+                if let Some(i) = self.engine_setting_selected {
+                    let _ = self.engine_path.delete(i);
+                    self.engine_setting_selected = None;
+                }
             }
             Message::ChangeEngine(index) => {
                 let args = self.engine_path.get_all_paths()[index].clone();
@@ -176,6 +212,14 @@ impl RBoard {
                     let analyzes = Analyzes::from_string(&self.engine_analyze);
                     self.engine_analyzes_table.rows = analyzes.datas.clone();
                     self.analyzes = Arc::new(analyzes);
+                    if self.analyzes.datas.len() > 0 {
+                        let winrate = self.analyzes.datas[0].winrate * 100.0;
+                        if self.board_state.chessboard.get_player() == Player::Black {
+                            self.black_winrate = winrate;
+                        } else {
+                            self.black_winrate = 100.0 - winrate;
+                        }
+                    }
                 } else if data.starts_with("Why you give a finished board here") {
                     if let Some(gtp) = self.engine.take() {
                         let _ = gtp.send_command("stop".to_string());
@@ -210,6 +254,10 @@ impl RBoard {
             "引擎管理",
             Message::OpenEngineManager,
         )));
+        engine_path.push(Item::new(styles::button::secondary_menu_button(
+            "添加引擎",
+            Message::AddEngineButton,
+        )));
 
         let mut all_board = vec![];
         for (name, id) in get_all_board_names() {
@@ -237,19 +285,51 @@ impl RBoard {
             menu_template(engine_path).max_width(e_len as f32 * 10.0)
             )
         ).spacing(10.0);
-        //colunm
-        let engine_table = responsive(|size| {
-            let engine_tables = table(
-                self.engine_table_info.header.clone(),
-                self.engine_table_info.body.clone(),
-                &self.engine_table_info.columns,
-                &self.engine_table_info.rows,
-                Message::EngineTableSyncHeader,
-            )
-            .footer(self.engine_table_info.footer.clone())
-            .min_width(size.width);
-            engine_tables.into()
-        });
+
+        //engine setting
+        let engine_setting_selection_list = SelectionList::new_with(
+            &self.engine_name_list[..],
+            Message::ChangeEngineSettingSelectionList,
+            12.0,
+            5.0,
+            iced_aw::style::selection_list::primary,
+            self.engine_setting_selected,
+            Font::with_name("汉仪文黑"),
+        )
+        .height(70.0);
+        let engine_setting_delete_button = button("删除")
+            .on_press(Message::DeleteEngine)
+            .height(30.0)
+            .width(Length::Fill);
+        let engine_setting_close_button = button("完成")
+            .on_press(Message::CloseEngineManager)
+            .height(30.0)
+            .width(Length::Fill);
+        let engine_setting_name;
+        let engine_setting_arg;
+        if let Some(i) = self.engine_setting_selected {
+            let engine_arg = self.engine_path.paths[i].clone();
+            engine_setting_name = text_input("", &engine_arg.path)
+                .on_input(move |name| Message::ChangeEngineName(i, name));
+            engine_setting_arg = text_editor(&self.engine_setting_arg_content)
+                .on_action(move |action| Message::ChangeEngineArgs(i, action));
+        } else {
+            engine_setting_name = text_input("", "");
+            engine_setting_arg = text_editor(&self.engine_setting_arg_content);
+        }
+        let engine_setting = row![
+            column![
+                engine_setting_selection_list,
+                row![engine_setting_delete_button, engine_setting_close_button]
+                    .spacing(2.0)
+                    .width(Length::Fill)
+            ]
+            .width(130.0)
+            .spacing(3.0),
+            column![engine_setting_name, engine_setting_arg].spacing(3.0)
+        ]
+        .spacing(5.0)
+        .height(100.0);
 
         //board-
         let board = canvas(Board {
@@ -285,17 +365,18 @@ impl RBoard {
         )
         .width(250.0);
 
-        let rate = progress_bar(0.0..=100.0, 35.0).style(|_| progress_bar::Style {
-            background: Background::Color(Color::WHITE),
-            bar: Background::Color(Color::BLACK),
-            border: Border::default()
-                .color(Color::from_rgb8(211, 211, 211))
-                .width(2.0),
-        });
+        let rate =
+            progress_bar(0.0..=100.0, self.black_winrate as f32).style(|_| progress_bar::Style {
+                background: Background::Color(Color::WHITE),
+                bar: Background::Color(Color::BLACK),
+                border: Border::default()
+                    .color(Color::from_rgb8(211, 211, 211))
+                    .width(2.0),
+            });
         // Render the chessboard and pieces
         let mut main_view = Column::new().push(menu_bar);
         if self.show_engine_manager {
-            main_view = main_view.push(engine_table);
+            main_view = main_view.push(engine_setting);
         }
         main_view
             .push(

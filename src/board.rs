@@ -175,30 +175,56 @@ impl canvas::Program<Message> for Board {
                             .with_color(Color::from_rgba8(241, 9, 9, 1.0))
                             .with_width(2.0),
                     );
+                    let size_position = iced::Point::new(x - size * 0.4, y - size * 0.15);
+                    frame.fill_text(Text {
+                        content: format!("{:.2}%", data.winrate * 100.0),
+                        position: size_position,
+                        color: Color::BLACK,
+                        size: iced::Pixels(size * 0.25),
+                        ..Default::default()
+                    });
                 } else if data.winrate > 0.7 {
                     let x = x_padding + x1 as f32 * size + size / 2.0;
                     let y = y_padding + y1 as f32 * size + size / 2.0;
                     let center = iced::Point::new(x, y);
                     let circle = canvas::Path::circle(center, size / 2.0);
-                    frame.fill(&circle, Color::from_rgba8(187, 222, 251, 0.7));
+                    frame.fill(&circle, Color::from_rgba8(187, 222, 251, 0.5));
                     frame.stroke(
                         &circle,
                         Stroke::default()
                             .with_color(Color::from_rgba8(241, 9, 9, 1.0))
                             .with_width(2.0),
                     );
+                    let size_position = iced::Point::new(x - size * 0.4, y - size * 0.15);
+                    frame.fill_text(Text {
+                        content: format!("{:.2}%", data.winrate * 100.0),
+                        position: size_position,
+                        color: Color::BLACK,
+                        size: iced::Pixels(size * 0.25),
+                        ..Default::default()
+                    });
                 } else {
                     let x = x_padding + x1 as f32 * size + size / 2.0;
                     let y = y_padding + y1 as f32 * size + size / 2.0;
                     let center = iced::Point::new(x, y);
                     let circle = canvas::Path::circle(center, size / 2.0);
-                    frame.fill(&circle, Color::from_rgba8(255, 205, 210, 0.7));
+                    frame.fill(&circle, Color::from_rgba8(255, 205, 210, 0.3));
                     frame.stroke(
                         &circle,
                         Stroke::default()
                             .with_color(Color::from_rgba8(241, 9, 9, 1.0))
                             .with_width(2.0),
                     );
+                    if data.winrate > 0.5 {
+                        let size_position = iced::Point::new(x - size * 0.4, y - size * 0.15);
+                        frame.fill_text(Text {
+                            content: format!("{:.2}%", data.winrate * 100.0),
+                            position: size_position,
+                            color: Color::BLACK,
+                            size: iced::Pixels(size * 0.25),
+                            ..Default::default()
+                        });
+                    }
                 }
             }
         }

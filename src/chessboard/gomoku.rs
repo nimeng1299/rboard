@@ -63,4 +63,11 @@ impl ChessboardTrait for Gomoku {
         self.board = vec![vec![-1; 15]; 15];
         self.current_player = 0;
     }
+    fn get_player(&self) -> super::chessboard_trait::Player {
+        if self.current_player == 1 {
+            super::chessboard_trait::Player::White
+        } else {
+            super::chessboard_trait::Player::Black
+        }
+    }
 }

@@ -59,7 +59,16 @@ impl ChessboardTrait for Zhenqi {
             return None;
         }
         self.board[x as usize][y as usize] = self.current_player;
-        let direction = vec![(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1)];
+        let direction = vec![
+            (1, 0),
+            (1, 1),
+            (0, 1),
+            (-1, 1),
+            (-1, 0),
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+        ];
         for (dx, dy) in direction {
             let nx = x + dx;
             let ny = y + dy;
@@ -67,13 +76,11 @@ impl ChessboardTrait for Zhenqi {
                 let nnx = nx + dx;
                 let nny = ny + dy;
                 if self.get_state(nnx, nny) == PieceState::Empty {
-                    println!("go 1");
-                    self.board[nnx as usize][nny as usize] = self.board[nx as usize][nx as usize];
-                    self.board[nx as usize][nx as usize] = -1;
+                    self.board[nnx as usize][nny as usize] = self.board[nx as usize][ny as usize];
+                    self.board[nx as usize][ny as usize] = -1;
                 }
                 if self.get_state(nnx, nny) == PieceState::Outside {
-                    println!("go 2");
-                    self.board[nx as usize][nx as usize] = -1;
+                    self.board[nx as usize][ny as usize] = -1;
                 }
             }
         }
@@ -93,6 +100,13 @@ impl ChessboardTrait for Zhenqi {
     fn new_board(&mut self) {
         self.board = vec![vec![-1; 15]; 15];
         self.current_player = 0;
+    }
+    fn get_player(&self) -> super::chessboard_trait::Player {
+        if self.current_player == 1 {
+            super::chessboard_trait::Player::White
+        } else {
+            super::chessboard_trait::Player::Black
+        }
     }
 }
 

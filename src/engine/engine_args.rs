@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use json::JsonValue;
 
 #[derive(Clone)]
@@ -9,10 +11,15 @@ pub struct EngineArgs {
 
 impl EngineArgs {
     pub fn new(path: String) -> Self {
+        let s = path.clone();
+        let name = Path::new(&s)
+            .file_stem() // 获取不带扩展名的文件名
+            .and_then(|s| s.to_str())
+            .unwrap_or("engine");
         EngineArgs {
             path,
             args: String::new(),
-            name: String::new(),
+            name: name.to_string(),
         }
     }
     pub fn to_json(&self) -> JsonValue {
