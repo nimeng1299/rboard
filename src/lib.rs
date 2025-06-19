@@ -173,6 +173,12 @@ impl RBoard {
                 if let Some(i) = self.engine_setting_selected {
                     let _ = self.engine_path.delete(i);
                     self.engine_setting_selected = None;
+                    self.engine_name_list = self
+                        .engine_path
+                        .paths
+                        .iter()
+                        .map(|e| e.name.clone())
+                        .collect::<Vec<String>>();
                 }
             }
             Message::ChangeEngine(index) => {
