@@ -21,7 +21,7 @@ pub fn get_all_board_names() -> Vec<(String, String)> {
 }
 
 //棋子转坐标 例如:B8 -> 1 , (y - 8)
-pub fn get_piece(size: &String, x: u32, y: u32, ingore_i: bool) -> Option<(u32, u32)> {
+pub fn get_piece(size: &String, _x: u32, y: u32, ingore_i: bool) -> Option<(u32, u32)> {
     if *size == "pass".to_string() {
         return None;
     }

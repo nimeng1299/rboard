@@ -1,8 +1,8 @@
 use iced::{
-    Element, Length, Renderer, Size, Theme,
-    widget::{button, container, horizontal_space, scrollable, text, text_input},
+    Element, Length, Renderer, Theme,
+    widget::{container, scrollable, text},
 };
-use iced_table::{Table, table};
+use iced_table::table;
 
 use crate::{engine::analyze::Analyze, message::Message};
 

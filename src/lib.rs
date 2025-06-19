@@ -19,7 +19,7 @@ use rfd::AsyncFileDialog;
 use crate::board::{Board, BoardState};
 use crate::chessboard::chessboard_trait::Player;
 use crate::chessboard::get_all_board_names;
-use crate::engine::analyze::{Analyze, Analyzes};
+use crate::engine::analyze::Analyzes;
 use crate::engine::analyzes_table::AnalyzesTable;
 use crate::engine::engine_paths::EnginePaths;
 use crate::engine::gtp::GTP;
@@ -424,7 +424,8 @@ fn get_data() -> impl Stream<Item = Message> {
     iced::stream::channel(1000, |mut output| async move {
         let (sender, mut receiver) = iced::futures::channel::mpsc::channel::<String>(1000);
         let _ = output.send(Message::EngineSender(sender)).await;
-        while let input = receiver.select_next_some().await {
+        loop {
+            let input = receiver.select_next_some().await;
             let _ = output.send(Message::EngineReceiveOutput(input)).await;
         }
     })

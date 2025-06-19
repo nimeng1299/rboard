@@ -1,4 +1,4 @@
-use std::{cmp::max, sync::Arc};
+use std::sync::Arc;
 
 use iced::{
     Color, Point, Renderer, Theme,
@@ -24,9 +24,9 @@ impl canvas::Program<Message> for Board {
 
     fn draw(
         &self,
-        state: &Self::State,
+        _state: &Self::State,
         renderer: &Renderer,
-        theme: &Theme,
+        _theme: &Theme,
         bounds: iced::Rectangle,
         cursor: Cursor,
     ) -> Vec<Geometry<Renderer>> {
