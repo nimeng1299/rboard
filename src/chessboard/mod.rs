@@ -4,6 +4,20 @@ pub mod zhenqi;
 
 use crate::chessboard::chessboard_trait::ChessboardTrait;
 
+/// 根据给定名称创建并返回对应的棋盘实例。
+///
+/// # 参数
+/// - `name`: 棋盘类型的唯一标识字符串，例如 `"gomoku"`等。
+///   - 如果传入的 `name` 不在支持的列表中，当前实现会默认返回 `"gomoku"` 类型的棋盘实例。
+///
+/// # 返回值
+/// 返回一个 `Box<dyn ChessboardTrait>`，即指向实现了 `ChessboardTrait` 的具体棋盘对象的堆分配指针。
+///
+/// # 示例
+/// ```
+/// let board = get_chessboard("gomoku".to_string());
+/// // board: Box<dyn ChessboardTrait>
+/// ```
 pub fn get_chessboard(name: String) -> Box<dyn ChessboardTrait> {
     match name.as_str() {
         "gomoku" => Box::new(gomoku::Gomoku::new()),
@@ -12,7 +26,20 @@ pub fn get_chessboard(name: String) -> Box<dyn ChessboardTrait> {
     }
 }
 
-//(名字, 唯一名字)
+/// 获取所有可用棋盘类型的显示名称和唯一标识名称列表。
+///
+/// # 返回值
+/// 返回一个 `Vec<(String, String)>`，其中每个元素是一个二元组：
+/// - 第一个 `String`：供界面或日志展示的“友好名称”，例如 `"Gomoku 15 * 15"`
+/// - 第二个 `String`：对应的唯一标识名称，用于传入 `get_chessboard` 等函数，例如 `"gomoku"`
+///
+/// # 示例
+/// ```
+/// let names = get_all_board_names();
+/// for (display, key) in names {
+///     println!("显示名称: {}, 唯一标识: {}", display, key);
+/// }
+/// ```
 pub fn get_all_board_names() -> Vec<(String, String)> {
     vec![
         ("Gomoku 15 * 15".to_string(), "gomoku".to_string()),
